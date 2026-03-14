@@ -158,9 +158,13 @@
                 <div class="message error-msg" id="errorMsg">An error occurred. Please try again.</div>
             </form>
         </div>
-    </div>
 
-    <div id="disqus_thread" style="margin-top: 50px;"></div>
+        <!-- Disqus Comments Section -->
+        <div style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #eee;">
+            <h2 style="margin-bottom: 30px; color: #333;">Comments</h2>
+            <div id="disqus_thread"></div>
+        </div>
+    </div>
 
     <script src="main.js"></script>
     <script>
@@ -228,12 +232,10 @@
         /**
         *  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
         *  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables    */
-        /*
         var disqus_config = function () {
-        this.page.url = PAGE_URL;  // Replace PAGE_URL with your page's canonical URL variable
-        this.page.identifier = PAGE_IDENTIFIER; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+            this.page.url = window.location.href;
+            this.page.identifier = 'product-builder-page';
         };
-        */
         (function() { // DON'T EDIT BELOW THIS LINE
         var d = document, s = d.createElement('script');
         s.src = 'https://productbuilder-0mi6kcz2jq.disqus.com/embed.js';
