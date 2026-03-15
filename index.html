@@ -273,10 +273,17 @@
         <!-- Animal Type Test Tab -->
         <div id="animal" class="tab-content">
             <h1>Animal Type Test 🐱🐶</h1>
-            <p style="margin-bottom: 20px; color: #666;">Find out if you're a cat or dog! Point your camera at your face and let AI decide.</p>
+            <p style="margin-bottom: 20px; color: #666;">Upload your photo to find out if you're a cat or dog! Let AI decide your animal type.</p>
             <div class="animal-test-container">
-                <button type="button" id="startBtn" onclick="initAnimalTest()">Start Test</button>
-                <div id="webcam-container"></div>
+                <div style="margin-bottom: 30px;">
+                    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    <button type="button" id="uploadBtn" style="padding: 12px 30px; background-color: #667eea; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 20px;">
+                        📸 Choose Photo
+                    </button>
+                </div>
+                <div id="imagePreview" style="margin: 20px 0;">
+                    <img id="previewImg" style="max-width: 100%; max-height: 400px; border-radius: 10px; display: none;">
+                </div>
                 <div id="label-container"></div>
                 <div class="animal-result" id="animalResult">
                     <h3>Your Animal Type:</h3>
@@ -298,98 +305,80 @@
 
     <script src="main.js"></script>
     <script>
-        // Animal Type Test
+        // Animal Type Test - File Upload Version
         const URL = "https://teachablemachine.withgoogle.com/models/A3zNekymw/";
-        let model, webcam, labelContainer, maxPredictions;
-        let animalTestActive = false;
+        let model;
 
-        async function initAnimalTest() {
-            if (animalTestActive) return;
-
-            const startBtn = document.getElementById('startBtn');
-            startBtn.disabled = true;
-            startBtn.textContent = 'Loading...';
-
+        async function initAnimalModel() {
             try {
                 const modelURL = URL + "model.json";
                 const metadataURL = URL + "metadata.json";
-
                 model = await tmImage.load(modelURL, metadataURL);
-                maxPredictions = model.getTotalClasses();
-
-                const flip = true;
-                webcam = new tmImage.Webcam(300, 300, flip);
-                await webcam.setup();
-                await webcam.play();
-                animalTestActive = true;
-
-                document.getElementById("webcam-container").appendChild(webcam.canvas);
-                labelContainer = document.getElementById("label-container");
-
-                for (let i = 0; i < maxPredictions; i++) {
-                    const div = document.createElement("div");
-                    div.className = "label-item";
-                    labelContainer.appendChild(div);
-                }
-
-                startBtn.textContent = 'Stop Test';
-                startBtn.onclick = stopAnimalTest;
-
-                window.requestAnimationFrame(loop);
             } catch (error) {
-                console.error('Error initializing animal test:', error);
-                startBtn.disabled = false;
-                startBtn.textContent = 'Start Test';
+                console.error('Error loading model:', error);
             }
         }
 
-        function stopAnimalTest() {
-            if (webcam) {
-                webcam.stop();
-            }
-            animalTestActive = false;
-            const webcamContainer = document.getElementById("webcam-container");
-            webcamContainer.innerHTML = '';
-            document.getElementById("label-container").innerHTML = '';
-            document.getElementById("animalResult").classList.remove('show');
+        // Initialize model when page loads
+        window.addEventListener('load', initAnimalModel);
 
-            const startBtn = document.getElementById('startBtn');
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Test';
-            startBtn.onclick = () => initAnimalTest();
-        }
+        // Handle file upload
+        const uploadBtn = document.getElementById('uploadBtn');
+        const imageInput = document.getElementById('imageInput');
+        const previewImg = document.getElementById('previewImg');
+        const labelContainer = document.getElementById('label-container');
 
-        async function loop() {
-            if (!animalTestActive) return;
+        uploadBtn.addEventListener('click', () => {
+            imageInput.click();
+        });
 
-            webcam.update();
-            await predict();
-            window.requestAnimationFrame(loop);
-        }
+        imageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        async function predict() {
-            const prediction = await model.predict(webcam.canvas);
-            let maxProb = 0;
-            let maxClass = '';
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                previewImg.src = event.target.result;
+                previewImg.style.display = 'block';
 
-            for (let i = 0; i < maxPredictions; i++) {
-                const probability = prediction[i].probability.toFixed(2);
-                const classPrediction = prediction[i].className + ": " + probability;
-                labelContainer.childNodes[i].innerHTML = classPrediction;
+                // Create image element for prediction
+                const img = new Image();
+                img.onload = async () => {
+                    // Make predictions
+                    const predictions = await model.predict(img);
+                    let maxProb = 0;
+                    let maxClass = '';
 
-                if (prediction[i].probability > maxProb) {
-                    maxProb = prediction[i].probability;
-                    maxClass = prediction[i].className;
-                }
-            }
+                    // Clear previous results
+                    labelContainer.innerHTML = '';
 
-            if (maxProb > 0.7) {
-                document.getElementById('resultText').innerHTML = `<strong>${maxClass}</strong> (${(maxProb * 100).toFixed(1)}%)`;
-                document.getElementById('animalResult').classList.add('show');
-            } else {
-                document.getElementById('animalResult').classList.remove('show');
-            }
-        }
+                    // Display all predictions
+                    for (let i = 0; i < predictions.length; i++) {
+                        const probability = predictions[i].probability.toFixed(4);
+                        const classPrediction = predictions[i].className + ": " + (probability * 100).toFixed(1) + "%";
+
+                        const div = document.createElement("div");
+                        div.className = "label-item";
+                        div.innerHTML = classPrediction;
+                        labelContainer.appendChild(div);
+
+                        if (predictions[i].probability > maxProb) {
+                            maxProb = predictions[i].probability;
+                            maxClass = predictions[i].className;
+                        }
+                    }
+
+                    // Show result
+                    if (maxProb > 0.5) {
+                        document.getElementById('resultText').innerHTML = `<strong>${maxClass}</strong> (${(maxProb * 100).toFixed(1)}%)`;
+                        document.getElementById('animalResult').classList.add('show');
+                    }
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
     </script>
     <script>
         // Tab switching
