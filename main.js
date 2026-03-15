@@ -39,8 +39,10 @@ function getNumberColor(number) {
         return 'lotto-blue';
     } else if (number >= 21 && number <= 30) {
         return 'lotto-red';
-    } else if (number >= 31 && number <= 45) {
+    } else if (number >= 31 && number <= 40) {
         return 'lotto-gray';
+    } else if (number >= 41 && number <= 45) {
+        return 'lotto-green';
     }
 }
 
