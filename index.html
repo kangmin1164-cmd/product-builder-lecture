@@ -143,6 +143,68 @@
         #disqus_thread.visible {
             display: block;
         }
+        .animal-test-container {
+            text-align: center;
+        }
+        #webcam-container {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+        #webcam-container canvas {
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            max-width: 100%;
+        }
+        #label-container {
+            margin-top: 30px;
+            font-size: 18px;
+        }
+        .label-item {
+            padding: 15px;
+            margin: 10px 0;
+            background: #f0f0f0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .label-item strong {
+            color: #667eea;
+            font-size: 20px;
+        }
+        #startBtn {
+            padding: 12px 30px;
+            background-color: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+        #startBtn:hover {
+            background-color: #764ba2;
+        }
+        #startBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .animal-result {
+            margin-top: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            display: none;
+        }
+        .animal-result.show {
+            display: block;
+        }
+        .animal-result h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -154,6 +216,7 @@
         <div class="nav-tabs">
             <button class="nav-btn active" data-tab="lotto">Lotto Generator</button>
             <button class="nav-btn" data-tab="partnership">Partnership Inquiry</button>
+            <button class="nav-btn" data-tab="animal">Animal Type Test</button>
         </div>
 
         <!-- Lotto Tab -->
@@ -207,6 +270,21 @@
             </form>
         </div>
 
+        <!-- Animal Type Test Tab -->
+        <div id="animal" class="tab-content">
+            <h1>Animal Type Test 🐱🐶</h1>
+            <p style="margin-bottom: 20px; color: #666;">Find out if you're a cat or dog! Point your camera at your face and let AI decide.</p>
+            <div class="animal-test-container">
+                <button type="button" id="startBtn" onclick="initAnimalTest()">Start Test</button>
+                <div id="webcam-container"></div>
+                <div id="label-container"></div>
+                <div class="animal-result" id="animalResult">
+                    <h3>Your Animal Type:</h3>
+                    <div id="resultText" style="font-size: 18px;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Disqus Comments Section -->
         <div style="margin-top: 80px; padding-top: 40px; border-top: 2px solid #eee;">
             <button class="comments-toggle-btn" id="commentsToggleBtn">Show Comments</button>
@@ -214,7 +292,105 @@
         </div>
     </div>
 
+    <!-- Teachable Machine Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
     <script src="main.js"></script>
+    <script>
+        // Animal Type Test
+        const URL = "https://teachablemachine.withgoogle.com/models/A3zNekymw/";
+        let model, webcam, labelContainer, maxPredictions;
+        let animalTestActive = false;
+
+        async function initAnimalTest() {
+            if (animalTestActive) return;
+
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.textContent = 'Loading...';
+
+            try {
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                const flip = true;
+                webcam = new tmImage.Webcam(300, 300, flip);
+                await webcam.setup();
+                await webcam.play();
+                animalTestActive = true;
+
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+
+                for (let i = 0; i < maxPredictions; i++) {
+                    const div = document.createElement("div");
+                    div.className = "label-item";
+                    labelContainer.appendChild(div);
+                }
+
+                startBtn.textContent = 'Stop Test';
+                startBtn.onclick = stopAnimalTest;
+
+                window.requestAnimationFrame(loop);
+            } catch (error) {
+                console.error('Error initializing animal test:', error);
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Test';
+            }
+        }
+
+        function stopAnimalTest() {
+            if (webcam) {
+                webcam.stop();
+            }
+            animalTestActive = false;
+            const webcamContainer = document.getElementById("webcam-container");
+            webcamContainer.innerHTML = '';
+            document.getElementById("label-container").innerHTML = '';
+            document.getElementById("animalResult").classList.remove('show');
+
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Test';
+            startBtn.onclick = () => initAnimalTest();
+        }
+
+        async function loop() {
+            if (!animalTestActive) return;
+
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let maxProb = 0;
+            let maxClass = '';
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const probability = prediction[i].probability.toFixed(2);
+                const classPrediction = prediction[i].className + ": " + probability;
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+
+                if (prediction[i].probability > maxProb) {
+                    maxProb = prediction[i].probability;
+                    maxClass = prediction[i].className;
+                }
+            }
+
+            if (maxProb > 0.7) {
+                document.getElementById('resultText').innerHTML = `<strong>${maxClass}</strong> (${(maxProb * 100).toFixed(1)}%)`;
+                document.getElementById('animalResult').classList.add('show');
+            } else {
+                document.getElementById('animalResult').classList.remove('show');
+            }
+        }
+    </script>
     <script>
         // Tab switching
         const navBtns = document.querySelectorAll('.nav-btn');
